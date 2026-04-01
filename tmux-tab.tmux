@@ -18,8 +18,8 @@ main() {
     local binary
     local use_prefix
     binary="$CURRENT_DIR/bin/switcher"
-    bind_key=$(get_tmux_option "@tmux-tab-bind" "C-Tab")
-    use_prefix=$(get_tmux_option "@tmux-tab-prefix" "off")
+    bind_key=$(get_tmux_option "@tmux-tab-bind" "Tab")
+    use_prefix=$(get_tmux_option "@tmux-tab-prefix" "on")
 
     if [ ! -x "$binary" ]; then
         if ! "$CURRENT_DIR/scripts/install.sh"; then

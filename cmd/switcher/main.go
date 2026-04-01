@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -15,10 +16,16 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-const maxSessions = 5
+const defaultMaxSessions = 8
+const minMaxSessions = 5
+const absoluteMaxSessions = 12
 const previewRefreshInterval = 500 * time.Millisecond
-const minCardOuterWidth = 16
+const preferredCardOuterWidth = 46
+const preferredPreviewHeight = 12
+const minCardOuterWidth = 12
+const maxCardOuterWidth = 46
 const minPreviewHeight = 3
+const previewAspectDivisor = 3
 
 func tmuxBin() string {
 	if bin := os.Getenv("TMUX_BIN"); bin != "" {
@@ -39,6 +46,25 @@ func highlightTextColor() string {
 		return color
 	}
 	return "15"
+}
+
+func maxVisibleSessions() int {
+	value := strings.TrimSpace(os.Getenv("TMUX_TAB_MAX_TABS"))
+	if value == "" {
+		return defaultMaxSessions
+	}
+
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return defaultMaxSessions
+	}
+	if parsed < minMaxSessions {
+		return minMaxSessions
+	}
+	if parsed > absoluteMaxSessions {
+		return absoluteMaxSessions
+	}
+	return parsed
 }
 
 func tmuxCmd(args ...string) (string, error) {
@@ -181,7 +207,6 @@ type layout struct {
 	cardOuterW    int
 	cardInnerW    int
 	previewH      int
-	cardTotalH    int
 	horizontalGap int
 	verticalGap   int
 }
@@ -194,72 +219,43 @@ func ceilDiv(a, b int) int {
 }
 
 func computeLayout(width, height, count int) layout {
-	best := layout{
-		cols:          1,
-		rows:          count,
-		cardOuterW:    max(6, width-2),
-		cardInnerW:    max(4, width-4),
-		previewH:      1,
-		cardTotalH:    4,
-		horizontalGap: 1,
-		verticalGap:   1,
+	rows := 1
+	if count > 5 {
+		rows = 2
 	}
-	bestScore := -1
+	cols := ceilDiv(count, rows)
+	hGap := 1
+	vGap := 1
 
-	for cols := count; cols >= 1; cols-- {
-		rows := ceilDiv(count, cols)
-		hGap := 1
-		vGap := 1
+	cardOuterW := preferredCardOuterWidth
+	if neededWidth := cols*cardOuterW + (cols-1)*hGap; neededWidth > width {
+		cardOuterW = max(minCardOuterWidth, min(maxCardOuterWidth, (width-(cols-1)*hGap)/cols))
+	}
+	cardInnerW := max(4, cardOuterW-2)
 
-		availableOuterW := (width - (cols-1)*hGap) / cols
-		if availableOuterW < 6 {
-			continue
-		}
-
-		cardOuterW := availableOuterW
-		if cardOuterW < minCardOuterWidth && cols != 1 {
-			continue
-		}
-		cardInnerW := max(4, cardOuterW-2)
-
-		maxPreviewByHeight := ((height - (rows-1)*vGap) / rows) - 3
-		if maxPreviewByHeight < 1 {
-			continue
-		}
-
-		previewH := min(cardInnerW/2, maxPreviewByHeight)
-		if previewH < minPreviewHeight && rows == 1 && maxPreviewByHeight >= minPreviewHeight {
-			previewH = minPreviewHeight
-		}
-		if previewH < 1 {
-			continue
-		}
-
-		cardTotalH := previewH + 3
-		score := cols*1000 + previewH*10 + cardOuterW
-		if rows == 1 {
-			score += 10000
-		}
-
-		if score > bestScore {
-			bestScore = score
-			best = layout{
-				cols:          cols,
-				rows:          rows,
-				cardOuterW:    cardOuterW,
-				cardInnerW:    cardInnerW,
-				previewH:      previewH,
-				cardTotalH:    cardTotalH,
-				horizontalGap: hGap,
-				verticalGap:   vGap,
-			}
-		}
+	maxPreviewByHeight := ((height - (rows-1)*vGap) / rows) - 3
+	previewTarget := preferredPreviewHeight
+	if cardOuterW != preferredCardOuterWidth {
+		previewTarget = max(minPreviewHeight, cardInnerW/previewAspectDivisor)
+	}
+	previewH := min(previewTarget, maxPreviewByHeight)
+	if previewH < 1 {
+		previewH = 1
 	}
 
-	return best
+	return layout{
+		cols:          cols,
+		rows:          rows,
+		cardOuterW:    cardOuterW,
+		cardInnerW:    cardInnerW,
+		previewH:      previewH,
+		horizontalGap: hGap,
+		verticalGap:   vGap,
+	}
 }
 
 func initialModel(sessions []string) model {
+	maxSessions := maxVisibleSessions()
 	if len(sessions) > maxSessions {
 		sessions = sessions[:maxSessions]
 	}
@@ -402,7 +398,7 @@ func (m model) View() string {
 	}
 
 	grid := lipgloss.JoinVertical(lipgloss.Top, rows...)
-	return lipgloss.Place(w, h, lipgloss.Center, lipgloss.Center, grid)
+	return lipgloss.Place(w, h, lipgloss.Center, lipgloss.Top, grid)
 }
 
 func min(a, b int) int {
