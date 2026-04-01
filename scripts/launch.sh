@@ -61,7 +61,7 @@ fi
 TMUX_BIN=$(command -v tmux)
 TMUX_TAB_COLOR=$(get_tmux_option "@tmux-tab-color" "62")
 TMUX_TAB_TEXT_COLOR=$(get_tmux_option "@tmux-tab-text-color" "15")
-TMUX_TAB_MAX_TABS=$(normalize_max_tabs "$(get_tmux_option "@tmux-tab-max-tabs" "8")")
+TMUX_TAB_MAX_TABS=$(normalize_max_tabs "$(get_tmux_option "@tmux-tab-max-tabs" "7")")
 
 client_w=$(tmux display-message -p '#{client_width}')
 client_h=$(tmux display-message -p '#{client_height}')

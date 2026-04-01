@@ -16,7 +16,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-const defaultMaxSessions = 8
+const defaultMaxSessions = 7
 const minMaxSessions = 5
 const absoluteMaxSessions = 12
 const previewRefreshInterval = 500 * time.Millisecond

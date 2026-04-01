@@ -44,21 +44,22 @@ Reload with `tmux source-file ~/.tmux.conf`.
 
 ## Usage
 
-| Key | Action |
-| --- | --- |
-| `Ctrl-Tab` | Open switcher |
-| `Tab` / `l` / `j` / `Right` / `Down` | Next session |
-| `Shift-Tab` / `h` / `k` / `Left` / `Up` | Previous session |
-| `Enter` | Switch to selected session |
-| `Esc` / `q` | Close |
+| Key                                     | Action                     |
+| --------------------------------------- | -------------------------- |
+| `prefix + Tab`                          | Open switcher              |
+| `Tab` / `l` / `j` / `Right` / `Down`    | Next session               |
+| `Shift-Tab` / `h` / `k` / `Left` / `Up` | Previous session           |
+| `Enter`                                 | Switch to selected session |
+| `Esc` / `q`                             | Close                      |
 
 ## Options
 
 ```tmux
-set -g @tmux-tab-bind 'C-Tab'
-set -g @tmux-tab-prefix 'off'
+set -g @tmux-tab-bind 'Tab'
+set -g @tmux-tab-prefix 'on'
 set -g @tmux-tab-color '#cba6f7'
 set -g @tmux-tab-text-color '#000000'
+set -g @tmux-tab-max-tabs '7'
 ```
 
 > [!NOTE]
@@ -67,6 +68,7 @@ set -g @tmux-tab-text-color '#000000'
 > - `@tmux-tab-prefix` controls whether the trigger requires tmux prefix.
 > - `@tmux-tab-color` controls the selected card highlight color.
 > - `@tmux-tab-text-color` controls the selected card label text color.
+> - `@tmux-tab-max-tabs` sets the maximum number of visible cards. Supported range: `5` to `12`.
 
 ## How It Works
 
