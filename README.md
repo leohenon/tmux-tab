@@ -1,12 +1,12 @@
 <h1 align="center">tmux-tab</h1>
 
 <p align="center">
-  <a href="https://github.com/leohenon/tmux-tab/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/leohenon/tmux-tab/release.yml?style=flat-square&logo=github&logoColor=white&label=Release&color=3fb950" alt="Release"></a>
+  <a href="https://github.com/leohenon/tmux-tab/releases/latest"><img src="https://img.shields.io/github/v/release/leohenon/tmux-tab?style=flat-square&logo=github&logoColor=white&label=Release&color=3fb950" alt="Release"></a>
   <a href="https://github.com/tmux/tmux"><img src="https://img.shields.io/badge/tmux-3.2%2B-85c1e9?style=flat-square&logo=tmux&logoColor=white" alt="tmux"></a>
 </p>
 
 <p align="center">
-  alt-tab for tmux sessions.
+  Alt-tab for tmux sessions.
 </p>
 
 ![demo](assets/demo.gif)
