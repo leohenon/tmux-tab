@@ -44,36 +44,50 @@ Reload with `tmux source-file ~/.tmux.conf`.
 
 ## Usage
 
-| Key                                     | Action                     |
-| --------------------------------------- | -------------------------- |
-| `prefix + Tab`                          | Open switcher              |
-| `Tab` / `l` / `j` / `Right` / `Down`    | Next session               |
-| `Shift-Tab` / `h` / `k` / `Left` / `Up` | Previous session           |
-| `Enter`                                 | Switch to selected session |
-| `Esc` / `q`                             | Close                      |
+| Key                                     | Action                           |
+| --------------------------------------- | -------------------------------- |
+| `prefix + Tab`                          | Open switcher                    |
+| `Tab` / `l` / `j` / `Right` / `Down`    | Next session in the switcher     |
+| `Shift-Tab` / `h` / `k` / `Left` / `Up` | Previous session in the switcher |
+| `Enter`                                 | Switch to selected session       |
+| `Esc` / `q`                             | Close                            |
 
 ## Options
 
 ```tmux
+# Popup
 set -g @tmux-tab-bind 'Tab'
 set -g @tmux-tab-prefix 'on'
 set -g @tmux-tab-color '#cba6f7'
 set -g @tmux-tab-text-color '#000000'
 set -g @tmux-tab-max-tabs '7'
+
+# Optional direct cycle keys
+set -g @tmux-tab-cycle-bind 'n'
+set -g @tmux-tab-cycle-prev-bind 'p'
+set -g @tmux-tab-cycle-prefix 'on'
+set -g @tmux-tab-cycle-timeout '2'
 ```
 
 > [!NOTE]
 >
-> - `@tmux-tab-bind` sets the trigger key.
-> - `@tmux-tab-prefix` controls whether the trigger requires tmux prefix.
+> - `@tmux-tab-bind` sets the picker trigger key.
+> - `@tmux-tab-prefix` controls whether the picker trigger requires tmux prefix.
 > - `@tmux-tab-color` controls the selected card highlight color.
 > - `@tmux-tab-text-color` controls the selected card label text color.
 > - `@tmux-tab-max-tabs` sets the maximum number of visible cards. Supported range: `5` to `12`.
+> - `@tmux-tab-cycle-bind` sets the optional next-session key. Set it to an empty string to disable it.
+> - `@tmux-tab-cycle-prev-bind` sets the optional previous-session key.
+> - `@tmux-tab-cycle-prefix` controls whether the optional cycle keys require tmux prefix.
+> - `@tmux-tab-cycle-timeout` keeps repeated cycle presses in the same sequence for `n` seconds.
 
 ## How It Works
 
-- tmux hooks keep a per-server MRU session list in `/tmp`.
+- tmux hooks keep a per-server MRU session list in `/tmp` for the picker.
 - Previews come from `tmux capture-pane -e` and refresh while the popup is open.
+- Optional direct cycle keys switch sessions immediately without opening the picker.
+- They cycle through a short-lived snapshot of the MRU order, so repeated presses keep moving forward or backward instead of bouncing between the last two sessions.
+- After the cycle timeout expires, a new snapshot is taken.
 
 ## Development
 
