@@ -26,7 +26,7 @@ Reload tmux and press `prefix + I` to install plugins.
 
 > [!NOTE]
 >
-> `tmux-tab` installs a prebuilt switcher binary automatically on first load. If no release binary is available, it falls back to building locally when Go is installed.
+> `tmux-tab` installs or refreshes the matching switcher binary automatically when switcher sources change. Tagged releases use prebuilt binaries; unreleased checkouts fall back to building locally when Go is installed.
 
 ## Install (Manual)
 
@@ -41,6 +41,10 @@ run-shell ~/.tmux/plugins/tmux-tab/tmux-tab.tmux
 ```
 
 Reload with `tmux source-file ~/.tmux.conf`.
+
+## Update
+
+Use `prefix + U` to update installed TPM plugins.
 
 ## Usage
 

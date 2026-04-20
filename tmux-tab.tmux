@@ -15,22 +15,18 @@ get_tmux_option() {
 
 main() {
     local bind_key
-    local binary
     local cycle_bind_key
     local cycle_prev_bind_key
     local cycle_use_prefix
     local use_prefix
-    binary="$CURRENT_DIR/bin/switcher"
     bind_key=$(get_tmux_option "@tmux-tab-bind" "Tab")
     cycle_bind_key=$(get_tmux_option "@tmux-tab-cycle-bind" "")
     cycle_prev_bind_key=$(get_tmux_option "@tmux-tab-cycle-prev-bind" "")
     cycle_use_prefix=$(get_tmux_option "@tmux-tab-cycle-prefix" "on")
     use_prefix=$(get_tmux_option "@tmux-tab-prefix" "on")
 
-    if [ ! -x "$binary" ]; then
-        if ! "$CURRENT_DIR/scripts/install.sh"; then
-            return 1
-        fi
+    if ! "$CURRENT_DIR/scripts/install.sh"; then
+        return 1
     fi
 
     tmux set-hook -gu session-created 2>/dev/null
