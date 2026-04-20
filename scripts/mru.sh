@@ -51,8 +51,9 @@ mru_read() {
 
 mru_push() {
 	local name="$1"
-	local file
+	local file tmpfile
 	file=$(mru_file)
+	tmpfile="${file}.tmp.$$"
 
 	[ -z "$name" ] && return
 
@@ -70,5 +71,7 @@ mru_push() {
 		for e in "${entries[@]}"; do
 			echo "$e"
 		done
-	} >"$file"
+	} >"$tmpfile"
+
+	mv "$tmpfile" "$file"
 }
