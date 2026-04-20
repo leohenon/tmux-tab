@@ -126,7 +126,7 @@ func truncate(s string, max int) string {
 
 func mruFilePath() string {
 	pid := tmuxServerPID()
-	return filepath.Join("/tmp", "tmux-tab-mru-"+pid)
+	return filepath.Join("/tmp", "tmux-tab-mru-v2-"+pid)
 }
 
 func readMRU() []string {
@@ -142,6 +142,11 @@ func readMRU() []string {
 
 	var mruList []string
 	seen := make(map[string]bool)
+	currentSession, _ := tmuxCmd("display-message", "-p", "#{session_name}")
+	if currentSession != "" && liveSet[currentSession] {
+		mruList = append(mruList, currentSession)
+		seen[currentSession] = true
+	}
 
 	file, err := os.Open(mruFilePath())
 	if err == nil {

@@ -67,6 +67,9 @@ set -g @tmux-tab-cycle-bind 'n'
 set -g @tmux-tab-cycle-prev-bind 'p'
 set -g @tmux-tab-cycle-prefix 'on'
 set -g @tmux-tab-cycle-timeout '2'
+
+# Optional history reset
+set -g @tmux-tab-reset-on-detach 'off'
 ```
 
 > [!NOTE]
@@ -80,10 +83,11 @@ set -g @tmux-tab-cycle-timeout '2'
 > - `@tmux-tab-cycle-prev-bind` sets the optional previous-session key.
 > - `@tmux-tab-cycle-prefix` controls whether the optional cycle keys require tmux prefix.
 > - `@tmux-tab-cycle-timeout` keeps repeated cycle presses in the same sequence for `n` seconds.
+> - `@tmux-tab-reset-on-detach` clears MRU history when the last tmux client detaches from the server.
 
 ## How It Works
 
-- tmux hooks keep a per-server MRU session list in `/tmp` for the picker.
+- tmux hooks keep a per-server MRU list in `/tmp` for the picker. Newly created but never visited sessions are excluded.
 - Previews come from `tmux capture-pane -e` and refresh while the popup is open.
 - Optional direct cycle keys switch sessions immediately without opening the picker.
 - They cycle through a short-lived snapshot of the MRU order, so repeated presses keep moving forward or backward instead of bouncing between the last two sessions.

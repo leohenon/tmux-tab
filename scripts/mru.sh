@@ -2,12 +2,15 @@
 mru_file() {
 	local server_pid
 	server_pid=$(tmux display-message -p '#{pid}')
-	echo "/tmp/tmux-tab-mru-${server_pid}"
+	echo "/tmp/tmux-tab-mru-v2-${server_pid}"
 }
 
 mru_read() {
 	local file
 	file=$(mru_file)
+
+	local current_session
+	current_session=$(tmux display-message -p '#{session_name}' 2>/dev/null)
 
 	local -a live_sessions
 	while IFS= read -r s; do
@@ -25,6 +28,12 @@ mru_read() {
 
 	local -a mru_list
 	local -A seen
+
+	if [ -n "$current_session" ] && [ -n "${live_set[$current_session]+x}" ]; then
+		mru_list+=("$current_session")
+		seen["$current_session"]=1
+	fi
+
 	if [ -f "$file" ]; then
 		while IFS= read -r name; do
 			[ -z "$name" ] && continue

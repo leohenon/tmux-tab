@@ -2,6 +2,7 @@
 CURRENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_DIR="$(dirname "$CURRENT_DIR")"
 BINARY="$PLUGIN_DIR/bin/switcher"
+source "$CURRENT_DIR/mru.sh"
 
 min() {
 	if [ "$1" -lt "$2" ]; then
@@ -53,8 +54,10 @@ if [ ! -x "$BINARY" ]; then
 	exit 1
 fi
 
-session_count=$(tmux list-sessions -F '#{session_name}' 2>/dev/null | wc -l | tr -d ' ')
+readarray -t sessions < <(mru_read)
+session_count=${#sessions[@]}
 if [ "$session_count" -le 1 ]; then
+	tmux display-message "No recent sessions"
 	exit 0
 fi
 
