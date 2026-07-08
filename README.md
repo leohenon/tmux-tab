@@ -65,6 +65,7 @@ set -g @tmux-tab-prefix 'on'
 set -g @tmux-tab-color '#cba6f7'
 set -g @tmux-tab-text-color '#000000'
 set -g @tmux-tab-max-tabs '7'
+set -g @tmux-tab-preview-anchor 'bottom-left'
 
 # Optional direct cycle keys
 set -g @tmux-tab-cycle-bind 'n'
@@ -83,6 +84,7 @@ set -g @tmux-tab-reset-on-detach 'off'
 > - `@tmux-tab-color` controls the selected card highlight color.
 > - `@tmux-tab-text-color` controls the selected card label text color.
 > - `@tmux-tab-max-tabs` sets the maximum number of visible cards. Supported range: `5` to `12`.
+> - `@tmux-tab-preview-anchor` controls how each preview is windowed horizontally. `bottom-left` (default) keeps the leftmost columns, `bottom-right` keeps the rightmost, and `cursor` centers the window on the pane's cursor. Previews always show the most recent rows vertically.
 > - `@tmux-tab-cycle-bind` sets the optional next-session key. Set it to an empty string to disable it.
 > - `@tmux-tab-cycle-prev-bind` sets the optional previous-session key.
 > - `@tmux-tab-cycle-prefix` controls whether the optional cycle keys require tmux prefix.

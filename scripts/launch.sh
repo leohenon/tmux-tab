@@ -65,6 +65,7 @@ TMUX_BIN=$(command -v tmux)
 TMUX_TAB_COLOR=$(get_tmux_option "@tmux-tab-color" "62")
 TMUX_TAB_TEXT_COLOR=$(get_tmux_option "@tmux-tab-text-color" "15")
 TMUX_TAB_MAX_TABS=$(normalize_max_tabs "$(get_tmux_option "@tmux-tab-max-tabs" "7")")
+TMUX_TAB_PREVIEW_ANCHOR=$(get_tmux_option "@tmux-tab-preview-anchor" "bottom-left")
 
 client_w=$(tmux display-message -p '#{client_width}')
 client_h=$(tmux display-message -p '#{client_height}')
@@ -124,4 +125,4 @@ popup_h=$(max "$popup_h" "$min_popup_h")
 
 tmux display-popup -E -w "$popup_w" -h "$popup_h" \
 	-b rounded -S "fg=#A0A0A0" \
-	"/usr/bin/env TMUX_BIN='$TMUX_BIN' TMUX_TAB_COLOR='$TMUX_TAB_COLOR' TMUX_TAB_TEXT_COLOR='$TMUX_TAB_TEXT_COLOR' TMUX_TAB_MAX_TABS='$TMUX_TAB_MAX_TABS' '$BINARY'"
+	"/usr/bin/env TMUX_BIN='$TMUX_BIN' TMUX_TAB_COLOR='$TMUX_TAB_COLOR' TMUX_TAB_TEXT_COLOR='$TMUX_TAB_TEXT_COLOR' TMUX_TAB_MAX_TABS='$TMUX_TAB_MAX_TABS' TMUX_TAB_PREVIEW_ANCHOR='$TMUX_TAB_PREVIEW_ANCHOR' '$BINARY'"

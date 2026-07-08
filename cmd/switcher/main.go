@@ -48,6 +48,23 @@ func highlightTextColor() string {
 	return "15"
 }
 
+const (
+	previewAnchorLeft   = "bottom-left"
+	previewAnchorRight  = "bottom-right"
+	previewAnchorCursor = "cursor"
+)
+
+func previewAnchor() string {
+	switch strings.TrimSpace(os.Getenv("TMUX_TAB_PREVIEW_ANCHOR")) {
+	case previewAnchorRight:
+		return previewAnchorRight
+	case previewAnchorCursor:
+		return previewAnchorCursor
+	default:
+		return previewAnchorLeft
+	}
+}
+
 func maxVisibleSessions() int {
 	value := strings.TrimSpace(os.Getenv("TMUX_TAB_MAX_TABS"))
 	if value == "" {
@@ -105,12 +122,41 @@ func blankPreviewLine(line string) bool {
 	return stripped == "" || stripped == "~"
 }
 
-func tmuxCapturePane(session string) []string {
+type paneCapture struct {
+	lines       []string
+	cursorX     int
+	cursorY     int
+	cursorValid bool
+}
+
+func paneCursor(session string) (int, int, bool) {
+	out, err := tmuxCmd("display-message", "-p", "-t", session+":", "#{cursor_x} #{cursor_y}")
+	if err != nil {
+		return 0, 0, false
+	}
+	fields := strings.Fields(out)
+	if len(fields) != 2 {
+		return 0, 0, false
+	}
+	x, errX := strconv.Atoi(fields[0])
+	y, errY := strconv.Atoi(fields[1])
+	if errX != nil || errY != nil {
+		return 0, 0, false
+	}
+	return x, y, true
+}
+
+func tmuxCapturePane(session string, wantCursor bool) paneCapture {
 	out, err := tmuxCmd("capture-pane", "-e", "-t", session+":", "-p")
 	if err != nil {
-		return nil
+		return paneCapture{}
 	}
 	allLines := strings.Split(out, "\n")
+	var cursorX, cursorY int
+	var cursorValid bool
+	if wantCursor {
+		cursorX, cursorY, cursorValid = paneCursor(session)
+	}
 	for len(allLines) > 0 && blankPreviewLine(allLines[len(allLines)-1]) {
 		allLines = allLines[:len(allLines)-1]
 	}
@@ -118,11 +164,12 @@ func tmuxCapturePane(session string) []string {
 	for start < len(allLines) && blankPreviewLine(allLines[start]) {
 		start++
 	}
-	return allLines[start:]
-}
-
-func truncateAnsi(s string, max int) string {
-	return ansi.Truncate(s, max, "…")
+	return paneCapture{
+		lines:       allLines[start:],
+		cursorX:     cursorX,
+		cursorY:     cursorY - start,
+		cursorValid: cursorValid,
+	}
 }
 
 func truncate(s string, max int) string {
@@ -131,6 +178,42 @@ func truncate(s string, max int) string {
 		return string(runes[:max-1]) + "…"
 	}
 	return s
+}
+
+func windowLine(line string, width int, anchor string, cap paneCapture, isCursorRow bool) string {
+	if width <= 0 {
+		return ""
+	}
+	lineW := ansi.StringWidth(line)
+	if lineW <= width {
+		return line
+	}
+
+	switch anchor {
+	case previewAnchorRight:
+		return "…" + ansi.TruncateLeft(line, lineW-width+1, "")
+	case previewAnchorCursor:
+		if cap.cursorValid && isCursorRow {
+			left := cap.cursorX - width/2
+			if left > lineW-width {
+				left = lineW - width
+			}
+			if left < 0 {
+				left = 0
+			}
+			seg := ansi.Cut(line, left, left+width)
+			if left > 0 {
+				seg = "…" + ansi.Cut(seg, 1, width)
+			}
+			if left+width < lineW {
+				seg = ansi.Cut(seg, 0, width-1) + "…"
+			}
+			return seg
+		}
+		return ansi.Truncate(line, width, "…")
+	default:
+		return ansi.Truncate(line, width, "…")
+	}
 }
 
 func mruFilePath() string {
@@ -174,14 +257,15 @@ func readMRU() []string {
 }
 
 type previewsLoadedMsg struct {
-	previews map[string][]string
+	previews map[string]paneCapture
 }
 
 type previewTickMsg time.Time
 
 func captureAllPreviews(sessions []string) tea.Cmd {
 	return func() tea.Msg {
-		previews := make(map[string][]string)
+		previews := make(map[string]paneCapture)
+		wantCursor := previewAnchor() == previewAnchorCursor
 		var mu sync.Mutex
 		var wg sync.WaitGroup
 
@@ -189,9 +273,9 @@ func captureAllPreviews(sessions []string) tea.Cmd {
 			wg.Add(1)
 			go func(name string) {
 				defer wg.Done()
-				lines := tmuxCapturePane(name)
+				cap := tmuxCapturePane(name, wantCursor)
 				mu.Lock()
-				previews[name] = lines
+				previews[name] = cap
 				mu.Unlock()
 			}(s)
 		}
@@ -212,7 +296,7 @@ type model struct {
 	selected int
 	width    int
 	height   int
-	previews map[string][]string
+	previews map[string]paneCapture
 }
 
 type layout struct {
@@ -340,6 +424,7 @@ func (m model) View() string {
 	l := computeLayout(w, h, n)
 	highlight := highlightColor()
 	textColor := highlightTextColor()
+	anchor := previewAnchor()
 
 	nameSelectedStyle := lipgloss.NewStyle().
 		Bold(true).
@@ -379,15 +464,20 @@ func (m model) View() string {
 
 		var previewLines []string
 		if m.previews != nil {
-			if lines, ok := m.previews[s]; ok {
+			if cap, ok := m.previews[s]; ok {
+				lines := cap.lines
+				trimmed := 0
 				if len(lines) > l.previewH {
-					lines = lines[len(lines)-l.previewH:]
+					trimmed = len(lines) - l.previewH
+					lines = lines[trimmed:]
 				}
-				for _, line := range lines {
+				cursorRow := cap.cursorY - trimmed
+				for row, line := range lines {
+					windowed := windowLine(line, contentW, anchor, cap, cursorRow == row)
 					if selected {
-						previewLines = append(previewLines, truncateAnsi(line, contentW))
+						previewLines = append(previewLines, windowed)
 					} else {
-						previewLines = append(previewLines, truncate(ansi.Strip(line), contentW))
+						previewLines = append(previewLines, ansi.Strip(windowed))
 					}
 				}
 			}
