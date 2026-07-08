@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -122,6 +123,48 @@ func blankPreviewLine(line string) bool {
 	return stripped == "" || stripped == "~"
 }
 
+const tabWidth = 8
+
+func expandTabs(line string) string {
+	if !strings.ContainsRune(line, '\t') {
+		return line
+	}
+	var b strings.Builder
+	col := 0
+	for i := 0; i < len(line); {
+		if line[i] == '\t' {
+			spaces := tabWidth - (col % tabWidth)
+			for s := 0; s < spaces; s++ {
+				b.WriteByte(' ')
+			}
+			col += spaces
+			i++
+			continue
+		}
+		if line[i] == '\x1b' {
+			j := i + 1
+			for j < len(line) && !isANSITerminator(line[j]) {
+				j++
+			}
+			if j < len(line) {
+				j++
+			}
+			b.WriteString(line[i:j])
+			i = j
+			continue
+		}
+		_, size := utf8.DecodeRuneInString(line[i:])
+		b.WriteString(line[i : i+size])
+		col++
+		i += size
+	}
+	return b.String()
+}
+
+func isANSITerminator(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+}
+
 type paneCapture struct {
 	lines       []string
 	cursorX     int
@@ -152,6 +195,9 @@ func tmuxCapturePane(session string, wantCursor bool) paneCapture {
 		return paneCapture{}
 	}
 	allLines := strings.Split(out, "\n")
+	for i, line := range allLines {
+		allLines[i] = expandTabs(line)
+	}
 	var cursorX, cursorY int
 	var cursorValid bool
 	if wantCursor {
@@ -189,9 +235,10 @@ func windowLine(line string, width int, anchor string, cap paneCapture, isCursor
 		return line
 	}
 
+	var out string
 	switch anchor {
 	case previewAnchorRight:
-		return "…" + ansi.TruncateLeft(line, lineW-width+1, "")
+		out = "…" + ansi.TruncateLeft(line, lineW-width+1, "")
 	case previewAnchorCursor:
 		if cap.cursorValid && isCursorRow {
 			left := cap.cursorX - width/2
@@ -208,12 +255,18 @@ func windowLine(line string, width int, anchor string, cap paneCapture, isCursor
 			if left+width < lineW {
 				seg = ansi.Cut(seg, 0, width-1) + "…"
 			}
-			return seg
+			out = seg
+		} else {
+			out = ansi.Truncate(line, width, "…")
 		}
-		return ansi.Truncate(line, width, "…")
 	default:
-		return ansi.Truncate(line, width, "…")
+		out = ansi.Truncate(line, width, "…")
 	}
+
+	if ansi.StringWidth(out) > width {
+		out = ansi.Truncate(out, width, "")
+	}
+	return out
 }
 
 func mruFilePath() string {
@@ -437,15 +490,18 @@ func (m model) View() string {
 		Width(l.cardOuterW).
 		Align(lipgloss.Center)
 	contentW := max(4, l.cardInnerW-2)
+	boxMaxH := l.previewH + 2
 	previewSelectedStyle := lipgloss.NewStyle().
 		Width(l.cardInnerW).
 		Height(l.previewH).
+		MaxHeight(boxMaxH).
 		Padding(0, 1).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(highlight))
 	previewNormalStyle := lipgloss.NewStyle().
 		Width(l.cardInnerW).
 		Height(l.previewH).
+		MaxHeight(boxMaxH).
 		Padding(0, 1).
 		Foreground(lipgloss.Color("244")).
 		Border(lipgloss.RoundedBorder()).
