@@ -70,33 +70,54 @@ client_w=$(tmux display-message -p '#{client_width}')
 client_h=$(tmux display-message -p '#{client_height}')
 
 visible_tabs=$(min "$session_count" "$TMUX_TAB_MAX_TABS")
-if [ "$visible_tabs" -le 5 ]; then
-	rows=1
-	cols="$visible_tabs"
-else
+if [ "$visible_tabs" -gt 5 ]; then
 	rows=2
-	cols=$(((visible_tabs + 1) / 2))
+else
+	rows=1
 fi
+cols=$(((visible_tabs + rows - 1) / rows))
 
-card_w=46
-preview_h=12
-card_h=$((preview_h + 3))
 gap=1
-frame_w=2
-frame_h=0
-
-popup_w=$((cols * card_w + (cols - 1) * gap + frame_w))
-popup_h=$((rows * card_h + (rows - 1) * gap + frame_h))
+frame=2
+ideal_card_w=46
 
 max_popup_w=$((client_w - 4))
-max_popup_h=$((client_h - 2))
 max_popup_w=$(max "$max_popup_w" 1)
+ideal_popup_w=$((cols * ideal_card_w + (cols - 1) * gap + frame))
+popup_w=$(min "$ideal_popup_w" "$max_popup_w")
+interior_w=$((popup_w - frame))
+
+card_w=$ideal_card_w
+needed_w=$((cols * ideal_card_w + (cols - 1) * gap))
+if [ "$needed_w" -gt "$interior_w" ]; then
+	card_w=$(((interior_w - (cols - 1) * gap) / cols))
+	[ "$card_w" -lt 12 ] && card_w=12
+	[ "$card_w" -gt 46 ] && card_w=46
+fi
+card_inner_w=$((card_w - 2))
+[ "$card_inner_w" -lt 4 ] && card_inner_w=4
+
+grid_w=$((cols * card_w + (cols - 1) * gap))
+popup_w=$((grid_w + frame))
+popup_w=$(min "$popup_w" "$max_popup_w")
+
+if [ "$card_w" -eq "$ideal_card_w" ]; then
+	preview_h=12
+else
+	preview_h=$((card_inner_w / 3))
+	[ "$preview_h" -lt 3 ] && preview_h=3
+fi
+
+card_h=$((preview_h + 3))
+grid_h=$((rows * card_h + (rows - 1) * gap))
+popup_h=$((grid_h + frame))
+
+max_popup_h=$((client_h - 2))
 max_popup_h=$(max "$max_popup_h" 1)
 
 min_popup_w=$(min 50 "$max_popup_w")
 min_popup_h=$(min 8 "$max_popup_h")
 
-popup_w=$(min "$popup_w" "$max_popup_w")
 popup_h=$(min "$popup_h" "$max_popup_h")
 popup_w=$(max "$popup_w" "$min_popup_w")
 popup_h=$(max "$popup_h" "$min_popup_h")

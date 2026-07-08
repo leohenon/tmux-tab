@@ -403,7 +403,7 @@ func (m model) View() string {
 	}
 
 	grid := lipgloss.JoinVertical(lipgloss.Top, rows...)
-	return lipgloss.Place(w, h, lipgloss.Center, lipgloss.Top, grid)
+	return lipgloss.Place(w, h, lipgloss.Center, lipgloss.Center, grid)
 }
 
 func min(a, b int) int {
