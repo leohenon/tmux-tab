@@ -100,16 +100,25 @@ func tmuxSwitchClient(session string) {
 	exec.Command(tmuxBin(), "switch-client", "-t", session).Run()
 }
 
+func blankPreviewLine(line string) bool {
+	stripped := strings.TrimSpace(ansi.Strip(line))
+	return stripped == "" || stripped == "~"
+}
+
 func tmuxCapturePane(session string) []string {
 	out, err := tmuxCmd("capture-pane", "-e", "-t", session+":", "-p")
 	if err != nil {
 		return nil
 	}
 	allLines := strings.Split(out, "\n")
-	for len(allLines) > 0 && strings.TrimSpace(allLines[len(allLines)-1]) == "" {
+	for len(allLines) > 0 && blankPreviewLine(allLines[len(allLines)-1]) {
 		allLines = allLines[:len(allLines)-1]
 	}
-	return allLines
+	start := 0
+	for start < len(allLines) && blankPreviewLine(allLines[start]) {
+		start++
+	}
+	return allLines[start:]
 }
 
 func truncateAnsi(s string, max int) string {
@@ -342,22 +351,32 @@ func (m model) View() string {
 		Foreground(lipgloss.Color("250")).
 		Width(l.cardOuterW).
 		Align(lipgloss.Center)
+	contentW := max(4, l.cardInnerW-2)
 	previewSelectedStyle := lipgloss.NewStyle().
 		Width(l.cardInnerW).
 		Height(l.previewH).
+		Padding(0, 1).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(highlight))
 	previewNormalStyle := lipgloss.NewStyle().
 		Width(l.cardInnerW).
 		Height(l.previewH).
+		Padding(0, 1).
+		Foreground(lipgloss.Color("244")).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("238"))
+	placeholderStyle := lipgloss.NewStyle().
+		Width(contentW).
+		Height(l.previewH).
+		Align(lipgloss.Center, lipgloss.Center).
+		Foreground(lipgloss.Color("240")).
+		Italic(true)
 
 	var cards []string
 	for i, s := range m.sessions {
 		label := truncate(s, l.cardOuterW-2)
+		selected := i == m.selected
 
-		innerW := l.cardInnerW
 		var previewLines []string
 		if m.previews != nil {
 			if lines, ok := m.previews[s]; ok {
@@ -365,19 +384,36 @@ func (m model) View() string {
 					lines = lines[len(lines)-l.previewH:]
 				}
 				for _, line := range lines {
-					previewLines = append(previewLines, truncateAnsi(line, innerW))
+					if selected {
+						previewLines = append(previewLines, truncateAnsi(line, contentW))
+					} else {
+						previewLines = append(previewLines, truncate(ansi.Strip(line), contentW))
+					}
 				}
 			}
 		}
-		preview := strings.Join(previewLines, "\n")
 
 		var name, prev string
-		if i == m.selected {
+		if selected {
 			name = nameSelectedStyle.Render(label)
-			prev = previewSelectedStyle.Render(preview)
 		} else {
 			name = nameNormalStyle.Render(label)
-			prev = previewNormalStyle.Render(preview)
+		}
+
+		if len(previewLines) == 0 {
+			body := placeholderStyle.Render("— no output —")
+			if selected {
+				prev = previewSelectedStyle.Render(body)
+			} else {
+				prev = previewNormalStyle.Render(body)
+			}
+		} else {
+			preview := strings.Join(previewLines, "\n")
+			if selected {
+				prev = previewSelectedStyle.Render(preview)
+			} else {
+				prev = previewNormalStyle.Render(preview)
+			}
 		}
 
 		card := lipgloss.JoinVertical(lipgloss.Center, name, prev)
