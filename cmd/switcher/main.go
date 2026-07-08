@@ -172,12 +172,8 @@ type paneCapture struct {
 	cursorValid bool
 }
 
-func paneCursor(session string) (int, int, bool) {
-	out, err := tmuxCmd("display-message", "-p", "-t", session+":", "#{cursor_x} #{cursor_y}")
-	if err != nil {
-		return 0, 0, false
-	}
-	fields := strings.Fields(out)
+func parseCursorLine(line string) (int, int, bool) {
+	fields := strings.Fields(line)
 	if len(fields) != 2 {
 		return 0, 0, false
 	}
@@ -190,18 +186,26 @@ func paneCursor(session string) (int, int, bool) {
 }
 
 func tmuxCapturePane(session string, wantCursor bool) paneCapture {
-	out, err := tmuxCmd("capture-pane", "-e", "-t", session+":", "-p")
+	var out string
+	var err error
+	if wantCursor {
+		out, err = tmuxCmd("capture-pane", "-e", "-t", session+":", "-p",
+			";", "display-message", "-p", "-t", session+":", "#{cursor_x} #{cursor_y}")
+	} else {
+		out, err = tmuxCmd("capture-pane", "-e", "-t", session+":", "-p")
+	}
 	if err != nil {
 		return paneCapture{}
 	}
 	allLines := strings.Split(out, "\n")
-	for i, line := range allLines {
-		allLines[i] = expandTabs(line)
-	}
 	var cursorX, cursorY int
 	var cursorValid bool
-	if wantCursor {
-		cursorX, cursorY, cursorValid = paneCursor(session)
+	if wantCursor && len(allLines) > 0 {
+		cursorX, cursorY, cursorValid = parseCursorLine(allLines[len(allLines)-1])
+		allLines = allLines[:len(allLines)-1]
+	}
+	for i, line := range allLines {
+		allLines[i] = expandTabs(line)
 	}
 	for len(allLines) > 0 && blankPreviewLine(allLines[len(allLines)-1]) {
 		allLines = allLines[:len(allLines)-1]
