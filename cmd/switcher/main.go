@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 	"unicode/utf8"
 
@@ -33,6 +35,10 @@ func tmuxBin() string {
 		return bin
 	}
 	return "tmux"
+}
+
+func livePreviewEnabled() bool {
+	return strings.TrimSpace(os.Getenv("TMUX_TAB_LIVE_PREVIEW")) != "off"
 }
 
 func highlightColor() string {
@@ -114,8 +120,25 @@ func tmuxListSessions() []string {
 	return sessions
 }
 
-func tmuxSwitchClient(session string) {
-	exec.Command(tmuxBin(), "switch-client", "-t", session).Run()
+func tmuxClientSession(client string) (id, name string, err error) {
+	out, err := tmuxCmd("list-clients", "-F", "#{client_name}\t#{session_id}\t#{session_name}")
+	if err != nil {
+		return "", "", err
+	}
+	for _, line := range strings.Split(out, "\n") {
+		fields := strings.SplitN(line, "\t", 3)
+		if len(fields) == 3 && fields[0] == client {
+			return fields[1], fields[2], nil
+		}
+	}
+	return "", "", fmt.Errorf("tmux client %q is not attached", client)
+}
+
+func tmuxSwitchClient(client, session string) error {
+	// The trailing command waits for session-change hooks before cleanup.
+	_, err := tmuxCmd("switch-client", "-E", "-c", client, "-t", session,
+		";", "run-shell", "true")
+	return err
 }
 
 func blankPreviewLine(line string) bool {
@@ -291,7 +314,12 @@ func readMRU() []string {
 
 	var mruList []string
 	seen := make(map[string]bool)
-	currentSession, _ := tmuxCmd("display-message", "-p", "#{session_name}")
+	var currentSession string
+	if client := os.Getenv("TMUX_TAB_CLIENT"); client != "" {
+		_, currentSession, _ = tmuxClientSession(client)
+	} else {
+		currentSession, _ = tmuxCmd("display-message", "-p", "#{session_name}")
+	}
 	if currentSession != "" && liveSet[currentSession] {
 		mruList = append(mruList, currentSession)
 		seen[currentSession] = true
@@ -349,11 +377,14 @@ func previewTick() tea.Cmd {
 }
 
 type model struct {
-	sessions []string
-	selected int
-	width    int
-	height   int
-	previews map[string]paneCapture
+	livePreview bool
+	client      string
+	confirmed   bool
+	sessions    []string
+	selected    int
+	width       int
+	height      int
+	previews    map[string]paneCapture
 }
 
 type layout struct {
@@ -421,13 +452,21 @@ func initialModel(sessions []string) model {
 	}
 
 	return model{
-		sessions: sessions,
-		selected: selected,
-		previews: nil,
+		livePreview: livePreviewEnabled(),
+		sessions:    sessions,
+		selected:    selected,
+		previews:    nil,
+	}
+}
+
+func (m model) previewSelection() {
+	if m.livePreview && m.client != "" && len(m.sessions) > 0 {
+		_ = tmuxSwitchClient(m.client, "="+m.sessions[m.selected])
 	}
 }
 
 func (m model) Init() tea.Cmd {
+	m.previewSelection()
 	return tea.Batch(
 		captureAllPreviews(m.sessions),
 		previewTick(),
@@ -452,18 +491,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		)
 
 	case tea.KeyMsg:
+		previous := m.selected
 		switch msg.String() {
 		case "tab", "right", "l", "down", "j":
 			m.selected = (m.selected + 1) % len(m.sessions)
 		case "shift+tab", "left", "h", "up", "k":
 			m.selected = (m.selected - 1 + len(m.sessions)) % len(m.sessions)
 		case "enter":
-			if len(m.sessions) > 0 {
-				tmuxSwitchClient(m.sessions[m.selected])
-			}
+			m.confirmed = true
 			return m, tea.Quit
-		case "esc", "q":
+		case "esc", "q", "ctrl+c":
 			return m, tea.Quit
+		}
+		if m.selected != previous {
+			m.previewSelection()
 		}
 	}
 
@@ -606,14 +647,94 @@ func max(a, b int) int {
 	return b
 }
 
-func main() {
+func startPreviewMarker(path string) error {
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if os.IsExist(err) {
+		data, readErr := os.ReadFile(path)
+		pid, parseErr := strconv.Atoi(strings.TrimSpace(string(data)))
+		if readErr == nil && parseErr == nil && pid > 0 && syscall.Kill(pid, 0) == syscall.ESRCH {
+			if err = os.Remove(path); err == nil {
+				file, err = os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+			}
+		}
+	}
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintln(file, os.Getpid())
+	closeErr := file.Close()
+	if err != nil {
+		os.Remove(path)
+		return err
+	}
+	return closeErr
+}
+
+func run() error {
 	sessions := readMRU()
 	if len(sessions) <= 1 {
-		return
+		return nil
 	}
 
-	p := tea.NewProgram(initialModel(sessions), tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
+	client := os.Getenv("TMUX_TAB_CLIENT")
+	if client == "" {
+		client, _ = tmuxCmd("display-message", "-p", "#{client_name}")
+	}
+	if client == "" {
+		return fmt.Errorf("cannot identify tmux client")
+	}
+	original, _, err := tmuxClientSession(client)
+	if err != nil || original == "" {
+		return fmt.Errorf("cannot identify original session for %q", client)
+	}
+	m := initialModel(sessions)
+	var marker string
+	if m.livePreview {
+		marker = filepath.Join("/tmp", "tmux-tab-preview-"+tmuxServerPID()+"-"+filepath.Base(client))
+		if err := startPreviewMarker(marker); err != nil {
+			return fmt.Errorf("start session preview: %w", err)
+		}
+		defer os.Remove(marker)
+	}
+	m.client = client
+	p := tea.NewProgram(m, tea.WithAltScreen())
+	// Closing a popup's PTY sends SIGHUP; treat it like cancel as well.
+	hangup := make(chan os.Signal, 1)
+	done := make(chan struct{})
+	signal.Notify(hangup, syscall.SIGHUP)
+	defer signal.Stop(hangup)
+	defer close(done)
+	go func() {
+		select {
+		case <-hangup:
+			p.Quit()
+		case <-done:
+		}
+	}()
+	result, runErr := p.Run()
+	final, ok := result.(model)
+	if runErr != nil || !ok || !final.confirmed {
+		// Restore while the marker still suppresses MRU updates.
+		if m.livePreview {
+			err = tmuxSwitchClient(client, original)
+		}
+	} else {
+		// The final switch is a real visit, including if already previewed.
+		if marker != "" {
+			err = os.Remove(marker)
+		}
+		if err == nil {
+			err = tmuxSwitchClient(client, "="+final.sessions[final.selected])
+		}
+	}
+	if runErr != nil {
+		return runErr
+	}
+	return err
+}
+
+func main() {
+	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}

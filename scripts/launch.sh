@@ -65,10 +65,13 @@ TMUX_BIN=$(command -v tmux)
 TMUX_TAB_COLOR=$(get_tmux_option "@tmux-tab-color" "62")
 TMUX_TAB_TEXT_COLOR=$(get_tmux_option "@tmux-tab-text-color" "15")
 TMUX_TAB_MAX_TABS=$(normalize_max_tabs "$(get_tmux_option "@tmux-tab-max-tabs" "7")")
+TMUX_TAB_LIVE_PREVIEW=$(get_tmux_option "@tmux-tab-live-preview" "on")
 TMUX_TAB_PREVIEW_ANCHOR=$(get_tmux_option "@tmux-tab-preview-anchor" "bottom-left")
 
-client_w=$(tmux display-message -p '#{client_width}')
-client_h=$(tmux display-message -p '#{client_height}')
+TMUX_TAB_CLIENT="${1:-$(tmux display-message -p '#{client_name}')}"
+
+read -r client_w client_h < <(tmux list-clients -F '#{client_name} #{client_width} #{client_height}' |
+	awk -v client="$TMUX_TAB_CLIENT" '$1 == client { print $2, $3 }')
 
 visible_tabs=$(min "$session_count" "$TMUX_TAB_MAX_TABS")
 if [ "$visible_tabs" -gt 5 ]; then
@@ -123,6 +126,6 @@ popup_h=$(min "$popup_h" "$max_popup_h")
 popup_w=$(max "$popup_w" "$min_popup_w")
 popup_h=$(max "$popup_h" "$min_popup_h")
 
-tmux display-popup -E -w "$popup_w" -h "$popup_h" \
+tmux display-popup -c "$TMUX_TAB_CLIENT" -E -w "$popup_w" -h "$popup_h" \
 	-b rounded -S "fg=#A0A0A0" \
-	"/usr/bin/env TMUX_BIN='$TMUX_BIN' TMUX_TAB_COLOR='$TMUX_TAB_COLOR' TMUX_TAB_TEXT_COLOR='$TMUX_TAB_TEXT_COLOR' TMUX_TAB_MAX_TABS='$TMUX_TAB_MAX_TABS' TMUX_TAB_PREVIEW_ANCHOR='$TMUX_TAB_PREVIEW_ANCHOR' '$BINARY'"
+	"/usr/bin/env TMUX_BIN='$TMUX_BIN' TMUX_TAB_CLIENT='$TMUX_TAB_CLIENT' TMUX_TAB_LIVE_PREVIEW='$TMUX_TAB_LIVE_PREVIEW' TMUX_TAB_COLOR='$TMUX_TAB_COLOR' TMUX_TAB_TEXT_COLOR='$TMUX_TAB_TEXT_COLOR' TMUX_TAB_MAX_TABS='$TMUX_TAB_MAX_TABS' TMUX_TAB_PREVIEW_ANCHOR='$TMUX_TAB_PREVIEW_ANCHOR' '$BINARY'"

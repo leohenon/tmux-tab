@@ -32,7 +32,7 @@ main() {
     tmux set-hook -gu session-created 2>/dev/null
 
     tmux set-hook -g client-session-changed \
-        "run-shell '$CURRENT_DIR/scripts/on-session-changed.sh'"
+        "run-shell '$CURRENT_DIR/scripts/on-session-changed.sh #{q:hook_client} #{q:hook_session_name}'"
 
     tmux set-hook -g client-detached \
         "run-shell -b '$CURRENT_DIR/scripts/on-client-detached.sh \"#{hook_client}\"'"
@@ -55,10 +55,10 @@ main() {
 
     if [ "$use_prefix" = "on" ]; then
         tmux bind-key "$bind_key" \
-            run-shell "$CURRENT_DIR/scripts/launch.sh"
+            run-shell "$CURRENT_DIR/scripts/launch.sh \"#{client_name}\""
     else
         tmux bind-key -n "$bind_key" \
-            run-shell "$CURRENT_DIR/scripts/launch.sh"
+            run-shell "$CURRENT_DIR/scripts/launch.sh \"#{client_name}\""
     fi
 
     if [ -n "$cycle_bind_key" ]; then
