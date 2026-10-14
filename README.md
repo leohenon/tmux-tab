@@ -47,13 +47,15 @@ Reload with `tmux source-file ~/.tmux.conf`.
 
 ## Usage
 
-| Key                                     | Action                                  |
-| --------------------------------------- | --------------------------------------- |
-| `prefix + Tab`                          | Open switcher                           |
-| `Tab` / `l` / `j` / `Right` / `Down`    | Next session in the switcher            |
-| `Shift-Tab` / `h` / `k` / `Left` / `Up` | Previous session in the switcher        |
-| `Enter`                                 | Confirm the previewed session            |
-| `Esc` / `q` / `Ctrl-C`                  | Close and restore the original session  |
+| Key                        | Action                                                            |
+| -------------------------- | ----------------------------------------------------------------- |
+| `prefix + Tab`             | Open switcher                                                     |
+| `Tab` / `l` / `Right`      | Next session in the switcher                                      |
+| `Shift-Tab` / `h` / `Left` | Previous session in the switcher                                  |
+| `j` / `Down`               | Move down in two-row layout; otherwise move to the next session   |
+| `k` / `Up`                 | Move up in two-row layout; otherwise move to the previous session |
+| `Enter`                    | Confirm the previewed session                                     |
+| `Esc` / `q` / `Ctrl-C`     | Close and restore the original session                            |
 
 ## Options
 

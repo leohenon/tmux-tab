@@ -473,6 +473,30 @@ func (m model) Init() tea.Cmd {
 	)
 }
 
+func moveHorizontal(selected, count, delta int) int {
+	if count == 0 {
+		return selected
+	}
+	return (selected + delta + count) % count
+}
+
+func moveVertical(selected, count, cols, rows, delta int) int {
+	if rows < 2 || count == 0 {
+		return moveHorizontal(selected, count, delta)
+	}
+
+	target := selected + delta*cols
+	if target >= 0 && target < count {
+		return target
+	}
+	return moveHorizontal(selected, count, delta)
+}
+
+func (m *model) moveVertical(delta int) {
+	l := computeLayout(m.width, m.height, len(m.sessions))
+	m.selected = moveVertical(m.selected, len(m.sessions), l.cols, l.rows, delta)
+}
+
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -493,10 +517,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		previous := m.selected
 		switch msg.String() {
-		case "tab", "right", "l", "down", "j":
-			m.selected = (m.selected + 1) % len(m.sessions)
-		case "shift+tab", "left", "h", "up", "k":
-			m.selected = (m.selected - 1 + len(m.sessions)) % len(m.sessions)
+		case "tab", "right", "l":
+			m.selected = moveHorizontal(m.selected, len(m.sessions), 1)
+		case "shift+tab", "left", "h":
+			m.selected = moveHorizontal(m.selected, len(m.sessions), -1)
+		case "down", "j":
+			m.moveVertical(1)
+		case "up", "k":
+			m.moveVertical(-1)
 		case "enter":
 			m.confirmed = true
 			return m, tea.Quit
